@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # --- Backend Service (FastAPI) ---
+  backend:
+    # Build using the Dockerfile
+    build: ./backend
+    # Map host port 8000 to container port 8000
+    ports:
+      - "8000:8000"
+    # Mount local folder to the container 
+    volumes:
+      - ./backend:/app
+    # Ensure logs show up in the terminal immediately
+    environment:
+      - PYTHONUNBUFFERED=1
+
+
+  # --- Frontend Service (Streamlit) ---
+  frontend:
+    # Build using the Dockerfile in the /frontend folder
+    build: ./frontend
+    # Map host port 8501 to container port 8501
+    ports:
+      - "8501:8501"
+    # Mount local folder for development convenience
+    volumes:
+      - ./frontend:/app
+    # Ensure the backend is started before the frontend
+    depends_on:
+      - backend
