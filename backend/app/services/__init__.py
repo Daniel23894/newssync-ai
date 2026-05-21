@@ -1,0 +1,1 @@
+from app.services.news_services import get_top_headlines

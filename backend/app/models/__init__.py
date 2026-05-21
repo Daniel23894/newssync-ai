@@ -1,0 +1,1 @@
+from .news_item import NewsItem # tells Python a directory should be considered a package
