@@ -1,7 +1,9 @@
 import requests
+import os
 from app.models.news_item import NewsItem
 
-API_KEY = "e18c86155e664208950bbfd3c3b2a1f1"
+
+API_KEY = os.getenv("NEWS_API_KEY")
 
 # News API's specific address to retrieve what's trending atm
 BASE_URL = "https://newsapi.org/v2/top-headlines" 

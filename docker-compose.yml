@@ -11,6 +11,9 @@ services:
     # Mount local folder to the container 
     volumes:
       - ./backend:/app
+    # Inject secret key into the backend container 
+    env_file:
+      - .env
     # Ensure logs show up in the terminal immediately
     environment:
       - PYTHONUNBUFFERED=1
