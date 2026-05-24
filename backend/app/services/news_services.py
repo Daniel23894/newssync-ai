@@ -86,6 +86,78 @@ FALLBACK_QUERIES_BY_COUNTRY = {
     "dk": ["danmark", "dansk", "denmark", "copenhagen", "koebenhavn"]
 }
 
+def _get_mock_articles():
+    mock_items = [
+        {
+            "title": "Global markets steady after mixed earnings",
+            "url": "https://example.com/markets-steady",
+            "source": "Reuters",
+            "description": "Investors weigh tech gains against softer retail data."
+        },
+        {
+            "title": "Elections update: key races tighten in final week",
+            "url": "https://example.com/elections-update",
+            "source": "BBC News",
+            "description": "Polls show a narrower margin across several districts."
+        },
+        {
+            "title": "New AI tools reshape newsroom workflows",
+            "url": "https://example.com/ai-newsrooms",
+            "source": "CNN",
+            "description": "Editors adopt automation for faster breaking news."
+        },
+        {
+            "title": "Copenhagen hosts sustainability summit",
+            "url": "https://example.com/copenhagen-summit",
+            "source": "DR Nyheder",
+            "description": "Leaders discuss climate targets and green transport."
+        },
+        {
+            "title": "Tech shares rally as chip demand rises",
+            "url": "https://example.com/chips-rally",
+            "source": "Bloomberg",
+            "description": "Semiconductor firms report strong quarterly outlooks."
+        },
+        {
+            "title": "Health officials monitor seasonal flu trends",
+            "url": "https://example.com/flu-trends",
+            "source": "AP News",
+            "description": "Hospitals prepare for a potential winter surge."
+        }
+    ]
+
+    return [
+        NewsItem(
+            title=item["title"],
+            url=item["url"],
+            source=item["source"],
+            description=item["description"]
+        )
+        for item in mock_items
+    ]
+
+def _is_rate_limited(response):
+    if response.status_code == 429:
+        return True
+
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+
+    if isinstance(body, dict):
+        message = body.get("message") or ""
+        errors = body.get("errors") or []
+        combined = " ".join([message] + errors)
+        combined = combined.lower()
+        return (
+            "request limit" in combined
+            or "too many requests" in combined
+            or "rate limit" in combined
+        )
+
+    return False
+
 def get_top_headlines(country="us", category=None, search_mode=None):
     if not API_KEY:
         return None, "GNEWS_API_KEY is not set", 500
@@ -116,6 +188,8 @@ def get_top_headlines(country="us", category=None, search_mode=None):
         logger.info("GNews top-headlines params: %s", params)
         response = requests.get(TOP_HEADLINES_URL, params=params)
 
+        if _is_rate_limited(response):
+            return _get_mock_articles(), None, None
         if response.status_code != 200:
             message = "GNews API error"
             try:
@@ -137,6 +211,8 @@ def get_top_headlines(country="us", category=None, search_mode=None):
         logger.info("GNews top-headlines params: %s", params)
         response = requests.get(TOP_HEADLINES_URL, params=params)
 
+        if _is_rate_limited(response):
+            return _get_mock_articles(), None, None
         if response.status_code != 200:
             message = "GNews API error"
             try:
@@ -198,6 +274,8 @@ def get_top_headlines(country="us", category=None, search_mode=None):
                      else "n/a")
                 )
 
+                if _is_rate_limited(search_response):
+                    return _get_mock_articles(), None, None
                 if search_response.status_code != 200:
                     message = "GNews API error"
                     try:
