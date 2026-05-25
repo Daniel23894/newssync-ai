@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 # Set what is seen in the browser window tab and the main title on the page
 st.set_page_config(page_title="NewsSync AI", page_icon="🚀")
@@ -89,63 +90,135 @@ selected_search_mode = None
 if selected_search_mode_label:
     selected_search_mode = search_mode_options[selected_search_mode_label]
 
-use_mock_data = False
+mock_articles = [
+    {
+        "title": "Global markets steady after mixed earnings",
+        "source": "Reuters",
+        "url": "https://example.com/markets-steady",
+        "description": "Investors weigh tech gains against softer retail data."
+    },
+    {
+        "title": "Elections update: key races tighten in final week",
+        "source": "BBC News",
+        "url": "https://example.com/elections-update",
+        "description": "Polls show a narrower margin across several districts."
+    },
+    {
+        "title": "New AI tools reshape newsroom workflows",
+        "source": "CNN",
+        "url": "https://example.com/ai-newsrooms",
+        "description": "Editors adopt automation for faster breaking news."
+    },
+    {
+        "title": "Copenhagen hosts sustainability summit",
+        "source": "DR Nyheder",
+        "url": "https://example.com/copenhagen-summit",
+        "description": "Leaders discuss climate targets and green transport."
+    },
+    {
+        "title": "Tech shares rally as chip demand rises",
+        "source": "Bloomberg",
+        "url": "https://example.com/chips-rally",
+        "description": "Semiconductor firms report strong quarterly outlooks."
+    },
+    {
+        "title": "Health officials monitor seasonal flu trends",
+        "source": "AP News",
+        "url": "https://example.com/flu-trends",
+        "description": "Hospitals prepare for a potential winter surge."
+    },
+    {
+        "title": "Oil prices slip as supply outlook improves",
+        "source": "Reuters",
+        "url": "https://example.com/oil-prices",
+        "description": "Traders adjust to stronger output forecasts."
+    },
+    {
+        "title": "Major tech firm unveils new privacy controls",
+        "source": "BBC News",
+        "url": "https://example.com/privacy-controls",
+        "description": "The update adds clearer options for data sharing."
+    },
+    {
+        "title": "Sports federation announces tournament host",
+        "source": "CNN",
+        "url": "https://example.com/tournament-host",
+        "description": "The event will take place next summer."
+    },
+    {
+        "title": "Danish startups attract record investment",
+        "source": "DR Nyheder",
+        "url": "https://example.com/danish-startups",
+        "description": "Funding rounds highlight strong Nordic interest."
+    },
+    {
+        "title": "Central bank signals cautious rate path",
+        "source": "Bloomberg",
+        "url": "https://example.com/central-bank",
+        "description": "Officials cite mixed inflation indicators."
+    },
+    {
+        "title": "Wildfire containment improves after rainfall",
+        "source": "AP News",
+        "url": "https://example.com/wildfire-update",
+        "description": "Crews continue to monitor hotspots."
+    },
+    {
+        "title": "Energy grid upgrades accelerate across Europe",
+        "source": "Reuters",
+        "url": "https://example.com/grid-upgrades",
+        "description": "Projects aim to improve resilience and capacity."
+    },
+    {
+        "title": "Public transport fares to be frozen this year",
+        "source": "BBC News",
+        "url": "https://example.com/fare-freeze",
+        "description": "Officials say the move supports commuters."
+    },
+    {
+        "title": "New streaming lineup targets family audiences",
+        "source": "CNN",
+        "url": "https://example.com/streaming-lineup",
+        "description": "A slate of shows launches this fall."
+    },
+    {
+        "title": "Cultural festival draws record visitors",
+        "source": "DR Nyheder",
+        "url": "https://example.com/cultural-festival",
+        "description": "Organizers report higher attendance than last year."
+    },
+    {
+        "title": "Pharma sector sees steady demand growth",
+        "source": "Bloomberg",
+        "url": "https://example.com/pharma-demand",
+        "description": "Analysts note stable pipelines and approvals."
+    },
+    {
+        "title": "Regional airline adds new routes",
+        "source": "AP News",
+        "url": "https://example.com/new-routes",
+        "description": "The expansion focuses on short-haul travel."
+    }
+]
 
-try:
-    params = {"country": selected_country}
-    if selected_category:
-        params["category"] = selected_category
-    if selected_search_mode:
-        params["search_mode"] = selected_search_mode
+# Pure mock mode during testing to avoid API usage.
+data = mock_articles
 
-    response = requests.get(BACKEND_URL, params=params)
-    if response.status_code == 200:
-        data = response.json()
-    else:
-        use_mock_data = True
-except Exception:
-    use_mock_data = True
-
-if use_mock_data:
-    # Use mock data when the live API is rate-limited or unavailable.
-    data = [
-        {
-            "title": "Global markets steady after mixed earnings",
-            "source": "Reuters",
-            "url": "https://example.com",
-            "description": "Investors weigh tech gains against softer retail data."
-        },
-        {
-            "title": "Elections update: key races tighten in final week",
-            "source": "BBC News",
-            "url": "https://example.com",
-            "description": "Polls show a narrower margin across several districts."
-        },
-        {
-            "title": "New AI tools reshape newsroom workflows",
-            "source": "CNN",
-            "url": "https://example.com",
-            "description": "Editors adopt automation for faster breaking news."
-        },
-        {
-            "title": "Copenhagen hosts sustainability summit",
-            "source": "DR Nyheder",
-            "url": "https://example.com",
-            "description": "Leaders discuss climate targets and green transport."
-        },
-        {
-            "title": "Tech shares rally as chip demand rises",
-            "source": "Bloomberg",
-            "url": "https://example.com",
-            "description": "Semiconductor firms report strong quarterly outlooks."
-        },
-        {
-            "title": "Denmark wins big in international tech tournament",
-            "source": "DR Nyheder",
-            "url": "https://example.com",
-            "description": "A historic victory for the local software teams."
-        }
-    ]
+# Backend request temporarily disabled to avoid API calls.
+# try:
+#     params = {"country": selected_country}
+#     if selected_category:
+#         params["category"] = selected_category
+#     if selected_search_mode:
+#         params["search_mode"] = selected_search_mode
+#
+#     response = requests.get(BACKEND_URL, params=params)
+#     if response.status_code == 200:
+#         data = response.json()
+#     else:
+#         data = mock_articles
+# except Exception:
+#     data = mock_articles
 
 if search_query:
     search_lower = search_query.strip().lower()
@@ -168,6 +241,8 @@ else:
     ax.set_title("Articles by Source")
     ax.set_ylabel("Count")
     ax.tick_params(axis="x", rotation=45)
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.tight_layout()
     st.pyplot(fig)
 
     for item in data:
