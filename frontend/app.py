@@ -33,14 +33,115 @@ st.markdown(
         border-radius: 10px;
         background: #FAFAFA;
     }
+    .ai-cta {
+        display: flex;
+        justify-content: center;
+        margin: 2px 0 2px 0;
+    }
+    .ai-cta div[data-testid="stButton"] > button {
+        background: #FF7A1A !important;
+        color: #FFFFFF !important;
+        font-weight: 700;
+        font-size: 1.22rem;
+        padding: 1.0rem 2.9rem;
+        border-radius: 12px;
+        border: none;
+        transition: all 0.2s ease-in-out;
+        min-width: 320px;
+        box-shadow: 0 12px 24px rgba(255, 122, 26, 0.4);
+        letter-spacing: 0.3px;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.38);
+    }
+    .ai-cta div[data-testid="stButton"] > button:hover {
+        background: #FF6A00 !important;
+        transform: translateY(-1px);
+    }
+    .ai-summary-card {
+        background: #1E222B;
+        border: 1px solid #2D3139;
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin: 10px 0 24px 0;
+        font-family: "Inter", "Helvetica Neue", "Segoe UI", sans-serif;
+        line-height: 1.55;
+    }
+    .ai-summary-label {
+        color: #FF6B4A;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+    .ai-summary-text {
+        color: #F8FAFC;
+        font-size: 0.98rem;
+        line-height: 1.58;
+        margin-bottom: 14px;
+    }
+    .ai-summary-list {
+        color: #F8FAFC;
+        padding-left: 18px;
+        margin: 0 0 14px 0;
+    }
+    .ai-summary-list li {
+        margin-bottom: 6px;
+    }
+    .ai-sentiment-pill {
+        display: inline-block;
+        background: #2D3139;
+        color: #E2E8F0;
+        border-radius: 12px;
+        padding: 4px 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
     </style>
     """,
     unsafe_allow_html=True
 )
 
+st.html(
+    """
+    <style>
+    /* Force the Streamlit button to be bright branding orange */
+    div[data-testid="stButton"] button {
+        background-color: #FF6B4A !important;
+        color: white !important;
+        border: none !important;
+        padding: 0.9rem 2.6rem !important;
+        font-size: 1.25rem !important;
+        font-weight: 700 !important;
+        border-radius: 8px !important;
+        width: auto !important;
+        transition: transform 0.1s ease, background-color 0.2s ease !important;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.38) !important;
+    }
+    /* Add a subtle hover effect */
+    div[data-testid="stButton"] button:hover {
+        background-color: #E05333 !important;
+        color: white !important;
+        transform: scale(1.02);
+    }
+    </style>
+    """
+)
+
 # Set what is seen in the browser window tab and the main title on the page
 st.set_page_config(page_title="NewsSync AI", page_icon="🚀", layout="wide")
-st.markdown('<div class="app-title">Welcome to NewsSync AI</div>', unsafe_allow_html=True)
+st.markdown(
+    """
+    <div style="margin-bottom: 1.5rem;">
+        <div class="app-title" style="font-size: 2.2rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.5px;">
+            NewsSync <span style="color: #FF6B4A;">AI</span>
+        </div>
+        <div style="font-size: 1.0rem; color: #8A92A6; font-weight: 450; margin-top: -2px;">
+            Global News Intelligence & Automated Sentiment Analytics Engine
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 search_query = st.text_input("Search for a topic:")
 
@@ -108,6 +209,18 @@ selected_category_label = st.sidebar.selectbox(
     list(category_options.keys()),
     index=0
 )
+
+prev_country_label = st.session_state.get("prev_country_label")
+prev_category_label = st.session_state.get("prev_category_label")
+if (
+    (prev_country_label is not None and prev_country_label != selected_country_label)
+    or (prev_category_label is not None and prev_category_label != selected_category_label)
+):
+    st.session_state.llm_result = None
+    st.session_state.llm_error = None
+
+st.session_state.prev_country_label = selected_country_label
+st.session_state.prev_category_label = selected_category_label
 
 
 selected_country = country_options[selected_country_label]
@@ -243,7 +356,6 @@ if not data:
     st.info("No articles match your search.")
 else:
     st.success(f"Found: {len(data)} articles")
-    st.write("")
 
     if "llm_result" not in st.session_state:
         st.session_state.llm_result = None
@@ -264,46 +376,82 @@ else:
             ]
         }
 
-    col_ai, _ = st.columns([1, 2])
-    with col_ai:
-        if st.button("Generate AI Summary"):
-            st.session_state.llm_result = None
-            st.session_state.llm_error = None
-            payload = build_llm_payload(data)
-            with st.spinner("Generating summary..."):
-                try:
-                    response = requests.post(
-                        f"{BACKEND_URL}/llm/summary",
-                        json=payload,
-                        timeout=45
-                    )
-                    if response.status_code == 200:
-                        st.session_state.llm_result = response.json()
-                    else:
-                        detail = response.json().get("detail", "LLM request failed")
-                        st.session_state.llm_error = detail
-                except requests.RequestException:
-                    st.session_state.llm_error = "Could not reach LLM service."
+    st.markdown('<div style="margin: 0;">', unsafe_allow_html=True)
+    if st.button("Generate AI Summary"):
+        st.session_state.llm_result = None
+        st.session_state.llm_error = None
+        payload = build_llm_payload(data)
+        with st.spinner("Generating summary..."):
+            try:
+                response = requests.post(
+                    f"{BACKEND_URL}/llm/summary",
+                    json=payload,
+                    timeout=45
+                )
+                if response.status_code == 200:
+                    st.session_state.llm_result = response.json()
+                else:
+                    st.session_state.llm_error = response.json().get("detail", "LLM request failed")
+            except requests.RequestException:
+                st.session_state.llm_error = "Could not reach LLM service."
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if st.session_state.llm_error:
         st.error(st.session_state.llm_error)
     elif st.session_state.llm_result:
         result = st.session_state.llm_result
-        st.subheader("AI Summary")
-        st.write(result.get("summary", ""))
-
+        summary = result.get("summary", "")
         sentiment = result.get("sentiment", "Unknown")
-        st.write(f"Overall sentiment: {sentiment}")
-
         themes = result.get("themes", [])
-        if themes:
-            st.write("Main themes:")
-            st.write(", ".join(themes))
-
         rationale = result.get("rationale", "")
-        if rationale:
-            st.write("Why this sentiment:")
-            st.write(rationale)
+
+        safe_summary = html.escape(summary)
+        safe_sentiment = html.escape(sentiment)
+        safe_rationale = html.escape(rationale)
+        safe_themes = [html.escape(theme) for theme in themes if str(theme).strip()]
+        if not safe_themes:
+            safe_themes = ["General"]
+
+        sentiment_value = safe_sentiment.strip().lower()
+        if "positive" in sentiment_value:
+            sentiment_color = "#7CFF90"
+        elif "neutral" in sentiment_value:
+            sentiment_color = "#FFE36D"
+        elif "negative" in sentiment_value:
+            sentiment_color = "#FF8A8A"
+        else:
+            sentiment_color = "#E2E8F0"
+
+        theme_items = "".join([f"<li>{theme}</li>" for theme in safe_themes])
+        rationale_block = ""
+        if safe_rationale:
+            rationale_block = (
+                f"<div class=\"ai-summary-label\" style=\"color:#FF8C69;font-size:0.86rem;\">"
+                "Why this sentiment</div>"
+                f"<div class=\"ai-summary-text\">{safe_rationale}</div>"
+            )
+
+        st.markdown(
+            '<h3 style="color: #FF8C69; margin-top: 0; font-size: 1.4rem;">AI Summary</h3>',
+            unsafe_allow_html=True
+        )
+
+        st.markdown(
+            f"""
+            <div class="ai-summary-card">
+                <div class="ai-summary-label" style="color:#FF8C69;font-size:0.86rem;">Summary</div>
+                <div class="ai-summary-text" style="color:#F8FAFC;line-height:1.58;"><strong>{safe_summary}</strong></div>
+                <div class="ai-summary-label" style="color:#FF8C69;font-size:0.86rem;">Sentiment</div>
+                <div class="ai-summary-text" style="color:#F8FAFC;line-height:1.58;">
+                    <span class="ai-sentiment-pill" style="background:{sentiment_color};color:#0B0B0B;">{safe_sentiment}</span>
+                </div>
+                <div class="ai-summary-label" style="color:#FF8C69;font-size:0.86rem;">Main themes</div>
+                <ul class="ai-summary-list" style="color:#F8FAFC;line-height:1.58;">{theme_items}</ul>
+                {rationale_block}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
     df = pd.DataFrame(data)
     source_counts = df["source"].value_counts()
@@ -393,6 +541,8 @@ else:
             ax.yaxis.set_major_locator(MaxNLocator(integer=True))
             plt.tight_layout()
             st.pyplot(fig, use_container_width=True)
+
+    st.markdown('<div style="margin: 16px 0 6px 0;"></div>', unsafe_allow_html=True)
 
     topic_badge_styles = {
         "Business": {"bg": "#E8F5E9", "fg": "#2E7D32"},
