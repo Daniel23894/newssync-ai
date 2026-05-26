@@ -152,3 +152,65 @@ def generate_llm_summary(
         return _fallback_summary(articles), None, None
 
     return _parse_llm_json(content), None, None
+
+
+def translate_text(
+    text: str,
+    target_language: str
+) -> Tuple[Optional[dict], Optional[str], Optional[int]]:
+    if not MISTRAL_API_KEY:
+        return None, "MISTRAL_API_KEY is not set", 500
+
+    if not text.strip():
+        return None, "No text provided", 400
+
+    system_prompt = (
+        "You are a precise translator. Return only the translated text."
+    )
+    user_prompt = (
+        f"Translate this text into {target_language}:\n\n{text}"
+    )
+
+    payload = {
+        "model": "mistral-small-latest",
+        "temperature": 0.2,
+        "max_tokens": 600,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+    }
+
+    headers = {
+        "Authorization": f"Bearer {MISTRAL_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(
+            MISTRAL_URL,
+            headers=headers,
+            json=payload,
+            timeout=20
+        )
+    except requests.RequestException:
+        logger.exception("Mistral translate request failed")
+        return None, "Translation request failed", 502
+
+    if response.status_code != 200:
+        message = "Mistral API error"
+        try:
+            body = response.json()
+            message = body.get("message") or body.get("detail") or message
+        except ValueError:
+            if response.text:
+                message = response.text
+        return None, message, response.status_code
+
+    try:
+        response_data = response.json()
+        content = response_data["choices"][0]["message"]["content"]
+    except (KeyError, TypeError, ValueError):
+        return None, "Unexpected response from Mistral", 502
+
+    return {"translated_text": content.strip()}, None, None

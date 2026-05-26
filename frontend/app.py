@@ -96,6 +96,16 @@ st.markdown(
         font-size: 0.9rem;
         font-weight: 600;
     }
+    div[data-testid="stButton"] > button[aria-label="Translate to Local Language"] {
+        background: #4A90E2 !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        font-weight: 600 !important;
+    }
+    div[data-testid="stButton"] > button[aria-label="Translate to Local Language"]:hover {
+        background: #3B7BC1 !important;
+        color: #FFFFFF !important;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -128,22 +138,38 @@ st.html(
 )
 
 # Set what is seen in the browser window tab and the main title on the page
-st.set_page_config(page_title="NewsSync AI", page_icon="🚀", layout="wide")
+st.set_page_config(
+    page_title="NewsSync & Mind AI: AI-Powered Media Analytics Dashboard",
+    page_icon="N",
+    layout="wide"
+)
 st.markdown(
     """
     <div style="margin-bottom: 1.5rem;">
         <div class="app-title" style="font-size: 2.2rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.5px;">
-            NewsSync <span style="color: #FF6B4A;">AI</span>
+            News<span style="color: #FF6B4A;">Sync</span> &amp; Mind <span style="color: #FF6B4A;">AI</span>
         </div>
         <div style="font-size: 1.0rem; color: #8A92A6; font-weight: 450; margin-top: -2px;">
-            Global News Intelligence & Automated Sentiment Analytics Engine
+            AI-Powered Media Analytics Dashboard
         </div>
     </div>
     """,
     unsafe_allow_html=True
 )
 
-search_query = st.text_input("Search for a topic:")
+search_col, reset_col = st.columns([5, 1], vertical_alignment="center")
+with search_col:
+    st.text_input(
+        "Search for a topic:",
+        key="search_query",
+        placeholder="Search for a topic...",
+        label_visibility="collapsed"
+    )
+with reset_col:
+    if st.button("Reset", use_container_width=True):
+        st.session_state.search_query = ""
+
+search_query = st.session_state.get("search_query", "")
 
 # URL where the backend container lives inside the Docker network
 BACKEND_URL = "http://backend:8000"
@@ -218,6 +244,8 @@ if (
 ):
     st.session_state.llm_result = None
     st.session_state.llm_error = None
+    st.session_state.llm_translation = None
+    st.session_state.llm_translation_error = None
 
 st.session_state.prev_country_label = selected_country_label
 st.session_state.prev_category_label = selected_category_label
@@ -271,6 +299,10 @@ else:
         st.session_state.llm_result = None
     if "llm_error" not in st.session_state:
         st.session_state.llm_error = None
+    if "llm_translation" not in st.session_state:
+        st.session_state.llm_translation = None
+    if "llm_translation_error" not in st.session_state:
+        st.session_state.llm_translation_error = None
 
     def build_llm_payload(items):
         trimmed = items
@@ -286,25 +318,89 @@ else:
             ]
         }
 
-    st.markdown('<div style="margin: 0;">', unsafe_allow_html=True)
-    if st.button("Generate AI Summary"):
-        st.session_state.llm_result = None
-        st.session_state.llm_error = None
-        payload = build_llm_payload(data)
-        with st.spinner("Generating summary..."):
-            try:
-                response = requests.post(
-                    f"{BACKEND_URL}/llm/summary",
-                    json=payload,
-                    timeout=45
-                )
-                if response.status_code == 200:
-                    st.session_state.llm_result = response.json()
-                else:
-                    st.session_state.llm_error = response.json().get("detail", "LLM request failed")
-            except requests.RequestException:
-                st.session_state.llm_error = "Could not reach LLM service."
-    st.markdown("</div>", unsafe_allow_html=True)
+    generate_col, translate_col = st.columns([1, 1])
+    with generate_col:
+        if st.button("Generate AI Summary", use_container_width=True):
+            st.session_state.llm_result = None
+            st.session_state.llm_error = None
+            st.session_state.llm_translation = None
+            st.session_state.llm_translation_error = None
+            payload = build_llm_payload(data)
+            with st.spinner("Generating summary..."):
+                try:
+                    response = requests.post(
+                        f"{BACKEND_URL}/llm/summary",
+                        json=payload,
+                        timeout=45
+                    )
+                    if response.status_code == 200:
+                        st.session_state.llm_result = response.json()
+                    else:
+                        st.session_state.llm_error = response.json().get("detail", "LLM request failed")
+                except requests.RequestException:
+                    st.session_state.llm_error = "Could not reach LLM service."
+
+    with translate_col:
+        if st.session_state.get("llm_result"):
+            if st.button("Translate to Local Language", key="translate_summary", use_container_width=True):
+                st.session_state.llm_translation = None
+                st.session_state.llm_translation_error = None
+                summary_text = st.session_state.llm_result.get("summary", "")
+
+                country_language_map = {
+                    "Denmark": "Danish",
+                    "Norway": "Norwegian",
+                    "Sweden": "Swedish",
+                    "United Kingdom": "English",
+                    "Ireland": "English",
+                    "USA": "English",
+                    "Netherlands": "Dutch",
+                    "Belgium": "Dutch",
+                    "Germany": "German",
+                    "France": "French",
+                    "Switzerland": "German",
+                    "Austria": "German",
+                    "Italy": "Italian",
+                    "Portugal": "Portuguese",
+                    "Poland": "Polish",
+                    "Czech Republic": "Czech",
+                    "Slovakia": "Slovak",
+                    "Slovenia": "Slovenian",
+                    "Hungary": "Hungarian",
+                    "Romania": "Romanian",
+                    "Bulgaria": "Bulgarian",
+                    "Greece": "Greek",
+                    "Latvia": "Latvian",
+                    "Lithuania": "Lithuanian",
+                    "Serbia": "Serbian",
+                    "Russia": "Russian",
+                    "Ukraine": "Ukrainian",
+                    "Israel": "Hebrew",
+                    "UAE (Dubai)": "Arabic",
+                    "Turkey": "Turkish",
+                    "Thailand": "Thai",
+                    "Indonesia (Bali)": "Indonesian"
+                }
+                target_language = country_language_map.get(selected_country_label, "English")
+
+                with st.spinner("Translating summary..."):
+                    try:
+                        translate_payload = {
+                            "text": summary_text,
+                            "target_language": target_language
+                        }
+                        translate_response = requests.post(
+                            f"{BACKEND_URL}/llm/translate",
+                            json=translate_payload,
+                            timeout=30
+                        )
+                        if translate_response.status_code == 200:
+                            st.session_state.llm_translation = translate_response.json().get("translated_text")
+                        else:
+                            detail = translate_response.json().get("detail", "Translation failed")
+                            st.session_state.llm_translation_error = detail
+                    except requests.RequestException:
+                        st.session_state.llm_translation_error = "Could not reach translation service."
 
     if st.session_state.llm_error:
         st.error(st.session_state.llm_error)
@@ -346,6 +442,15 @@ else:
             unsafe_allow_html=True
         )
 
+        translated_text = st.session_state.llm_translation
+        translation_block = ""
+        if translated_text:
+            safe_translation = html.escape(translated_text)
+            translation_block = (
+                f"<div class=\"ai-summary-label\" style=\"color:#FF8C69;font-size:0.86rem;\">Translated summary</div>"
+                f"<div class=\"ai-summary-text\" style=\"color:#F8FAFC;line-height:1.58;\">{safe_translation}</div>"
+            )
+
         st.markdown(
             f"""
             <div class="ai-summary-card">
@@ -358,6 +463,7 @@ else:
                 <div class="ai-summary-label" style="color:#FF8C69;font-size:0.86rem;">Main themes</div>
                 <ul class="ai-summary-list" style="color:#F8FAFC;line-height:1.58;">{theme_items}</ul>
                 {rationale_block}
+                {translation_block}
                 <div style="font-size: 0.8rem; color: #718096; margin-top: 12px; border-top: 1px solid #2D3139; padding-top: 8px; font-style: italic;">
                     Note: To optimize performance, the AI summary is generated using the top 12 most relevant articles.
                 </div>
@@ -366,7 +472,13 @@ else:
             unsafe_allow_html=True
         )
 
+    if st.session_state.llm_translation_error:
+        st.error(st.session_state.llm_translation_error)
+
     df = pd.DataFrame(data)
+    df["source"] = df["source"].apply(
+        lambda x: f"{str(x)[:15]}..." if len(str(x)) > 15 else str(x)
+    )
     source_counts = df["source"].value_counts()
 
     tab1, tab2, tab3 = st.tabs(["Market Distribution", "Timeline Trends", "Efficiency Metrics"])
@@ -392,7 +504,7 @@ else:
                 autopct="%1.0f%%",
                 startangle=90,
                 colors=pastel_colors,
-                textprops={"color": "black"}
+                textprops={"color": "black", "fontsize": 9}
             )
             centre_circle = plt.Circle((0, 0), 0.55, fc="white")
             fig.gca().add_artist(centre_circle)

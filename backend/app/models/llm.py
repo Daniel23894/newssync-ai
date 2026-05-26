@@ -18,3 +18,12 @@ class LLMSummaryResponse(BaseModel):
     sentiment: str
     themes: List[str]
     rationale: str
+
+
+class LLMTranslateRequest(BaseModel):
+    text: str
+    target_language: str
+
+
+class LLMTranslateResponse(BaseModel):
+    translated_text: str
