@@ -8,3 +8,6 @@ class NewsItem(BaseModel):
     url: str
     source: str
     category: Optional[str] = "General"
+    topic: Optional[str] = "General"
+    published_hour: Optional[float] = None
+    sentiment: Optional[float] = 0.0

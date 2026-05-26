@@ -1,6 +1,7 @@
 import requests
 import os
 import logging
+from datetime import datetime
 from app.models.news_item import NewsItem
 
 
@@ -86,6 +87,60 @@ FALLBACK_QUERIES_BY_COUNTRY = {
     "dk": ["danmark", "dansk", "denmark", "copenhagen", "koebenhavn"]
 }
 
+POSITIVE_KEYWORDS = {"rally", "growth", "record", "gain"}
+NEGATIVE_KEYWORDS = {"drop", "tighten", "flu", "risk", "loss"}
+
+TOPIC_KEYWORDS = {
+    "Sports": {"game", "nba", "spurs", "sports", "athletic", "court"},
+    "Technology": {"cybersecurity", "ai", "tech", "software", "vulnerability", "online", "data"},
+    "Business": {"market", "business", "ipo", "finance", "investment", "dollar"},
+    "Health": {"health", "flu", "medical", "vaccine", "virus"}
+}
+
+DK_QUERY_TERMS = [
+    "Danmark",
+    "København",
+    "Mette Frederiksen",
+    "regering"
+]
+
+
+def _parse_published_hour(raw_date):
+    if not raw_date:
+        return None
+
+    try:
+        dt_str = raw_date.replace("Z", "+00:00")
+        return datetime.fromisoformat(dt_str).hour
+    except ValueError:
+        return None
+
+
+def _score_sentiment(text):
+    lowered = (text or "").lower()
+    if any(word in lowered for word in POSITIVE_KEYWORDS):
+        return 0.4
+    if any(word in lowered for word in NEGATIVE_KEYWORDS):
+        return -0.4
+    return 0.0
+
+
+def _classify_topic(text):
+    lowered = (text or "").lower()
+    for topic, keywords in TOPIC_KEYWORDS.items():
+        if any(word in lowered for word in keywords):
+            return topic
+    return "General"
+
+
+def _build_dk_query(category):
+    fallback_terms = FALLBACK_QUERIES_BY_COUNTRY.get("dk", [])
+    terms = DK_QUERY_TERMS + fallback_terms
+    base = " OR ".join(terms)
+    if category:
+        return f"({base}) AND {category}"
+    return base
+
 def _get_mock_articles():
     mock_items = [
         {
@@ -170,11 +225,14 @@ def get_top_headlines(country="us", category=None, search_mode=None):
 
     use_dk_fallback = search_mode == "broad"
 
+    query_suffix = category if category else None
+    dk_query = _build_dk_query(category) if country == "dk" else None
+
     # Pass parameters to the API
     params = {
         "country": country,
         "token": API_KEY,
-        "max": 5
+        "max": 18
     }
 
     language = LANGUAGE_BY_COUNTRY.get(country)
@@ -183,6 +241,9 @@ def get_top_headlines(country="us", category=None, search_mode=None):
 
     if category:
         params["topic"] = category
+        params["q"] = category
+    if dk_query:
+        params["q"] = dk_query
     
     if country == "dk" and search_mode == "strict":
         logger.info("GNews top-headlines params: %s", params)
@@ -246,10 +307,17 @@ def get_top_headlines(country="us", category=None, search_mode=None):
                 query_list.append("news")
 
         for query in query_list:
+            if dk_query:
+                query = dk_query
+            elif query_suffix:
+                if query:
+                    query = f"{query} AND {query_suffix}"
+                else:
+                    query = query_suffix
             search_params = {
                 "q": query,
                 "token": API_KEY,
-                "max": 5,
+                "max": 18,
                 "sortby": "publishedAt"
             }
 
@@ -299,13 +367,32 @@ def get_top_headlines(country="us", category=None, search_mode=None):
 
     # Map (transform) the News API's data to NewsItem model
     news_list = []
-    for art in articles[:5]:
+    hour_counts = {}
+    for art in articles[:18]:
         source = art.get("source") or {}
+        raw_date = art.get("publishedAt") or art.get("published_date")
+        base_hour = _parse_published_hour(raw_date)
+        published_hour = None
+        if base_hour is not None:
+            seen_count = hour_counts.get(base_hour, 0)
+            hour_counts[base_hour] = seen_count + 1
+            published_hour = base_hour + (seen_count * 0.05) if seen_count else base_hour
+        text_blob = f"{art.get('title', '')} {art.get('description', '')}"
+        sentiment = _score_sentiment(text_blob)
+
+        # Access the category passed into the get_top_headlines outer function signature
+        if category and category != "All categories":
+            topic = category.title()
+        else:
+            topic = _classify_topic(text_blob)
         item = NewsItem(
             title=art.get("title", ""),
             url=art.get("url", ""),
             source=source.get("name", "Unknown source"),
-            description=art.get("description") # .get tries find description. If not there, None will be used instead of a missing paramter crashing the program
+            description=art.get("description"),
+            topic=topic,
+            published_hour=published_hour,
+            sentiment=sentiment
         )
         news_list.append(item)
     return news_list, None, None

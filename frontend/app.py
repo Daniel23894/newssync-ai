@@ -238,111 +238,21 @@ selected_search_mode = None
 if selected_search_mode_label:
     selected_search_mode = search_mode_options[selected_search_mode_label]
 
-mock_articles_by_country = {
-    "USA": [
-        {
-            "title": "Global markets steady after mixed earnings",
-            "source": "Reuters",
-            "url": "https://example.com/markets-steady",
-            "description": "Investors weigh tech gains against softer retail data as trading volumes ease. Analysts say the mixed results point to a cautious outlook for the next quarter. Several firms reiterated guidance, keeping sentiment stable. Market strategists expect short-term range-bound moves.",
-            "topic": "Business",
-            "published_hour": 9
-        },
-        {
-            "title": "Elections update: key races tighten in final week",
-            "source": "BBC News",
-            "url": "https://example.com/elections-update",
-            "description": "Polls show a narrower margin across several districts as turnout efforts intensify. Campaigns are focusing on undecided voters with late policy announcements. Analysts note rising engagement in suburban areas. Debate performances are expected to shape final preferences.",
-            "topic": "Politics",
-            "published_hour": 11
-        },
-        {
-            "title": "New AI tools reshape newsroom workflows",
-            "source": "CNN",
-            "url": "https://example.com/ai-newsrooms",
-            "description": "Editors are adopting automation to speed up breaking news production. Newsrooms are testing summarization, transcription, and fact-check aids. Managers emphasize clear human oversight for sensitive stories. The shift is expected to reduce turnaround times.",
-            "topic": "Technology",
-            "published_hour": 13
-        },
-        {
-            "title": "Tech shares rally as chip demand rises",
-            "source": "Bloomberg",
-            "url": "https://example.com/chips-rally",
-            "description": "Semiconductor firms report strong quarterly outlooks as data center demand accelerates. Supply chain delays have eased, supporting higher shipment forecasts. Analysts expect continued pricing strength through the year. The rally lifted major tech indices.",
-            "topic": "Business",
-            "published_hour": 15
-        },
-        {
-            "title": "Health officials monitor seasonal flu trends",
-            "source": "Reuters",
-            "url": "https://example.com/flu-trends",
-            "description": "Hospitals are preparing for a potential winter surge as flu activity increases. Public health officials recommend updated vaccinations for vulnerable groups. Clinics report higher appointment volumes compared to last month. Officials say hospitalization rates remain manageable.",
-            "topic": "Health",
-            "published_hour": 16
-        }
-    ],
-    "Denmark": [
-        {
-            "title": "Copenhagen hosts sustainability summit",
-            "source": "DR Nyheder",
-            "url": "https://example.com/copenhagen-summit",
-            "description": "Leaders discuss climate targets and green transport initiatives in Copenhagen. Delegates presented new funding models for city-wide retrofits. Experts highlighted measurable progress in cycling infrastructure. The summit concluded with a shared action plan.",
-            "topic": "Energy",
-            "published_hour": 9
-        },
-        {
-            "title": "Danish startups attract record investment",
-            "source": "Borsen",
-            "url": "https://example.com/danish-startups",
-            "description": "Funding rounds highlight strong Nordic interest in Danish startups. Several late-stage firms closed larger than expected rounds. Investors cited steady revenue growth and international expansion. The trend signals a healthy venture environment.",
-            "topic": "Business",
-            "published_hour": 11
-        },
-        {
-            "title": "Regional commuter rail expansion approved",
-            "source": "TV2",
-            "url": "https://example.com/rail-expansion",
-            "description": "New routes aim to reduce travel times across regions and improve reliability. Transport officials say the plan will add capacity during peak hours. Construction is scheduled to begin later this year. Local councils welcomed the investment.",
-            "topic": "Business",
-            "published_hour": 13
-        },
-        {
-            "title": "Cultural festival draws record visitors",
-            "source": "DR Nyheder",
-            "url": "https://example.com/cultural-festival",
-            "description": "Organizers report higher attendance than last year with strong weekend turnout. The festival expanded its program with new stages and family events. Local businesses saw a boost in foot traffic. Officials praised the event's accessibility.",
-            "topic": "Culture",
-            "published_hour": 15
-        },
-        {
-            "title": "Public health campaign boosts vaccination uptake",
-            "source": "TV2",
-            "url": "https://example.com/vaccination-uptake",
-            "description": "Officials say new outreach improved local coverage in several municipalities. Mobile clinics and extended hours helped reach more residents. Health authorities noted a clear rise in appointment bookings. The campaign will run through the end of the month.",
-            "topic": "Health",
-            "published_hour": 17
-        }
-    ]
-}
+data = []
+try:
+    params = {"country": selected_country}
+    if selected_category:
+        params["category"] = selected_category
+    if selected_search_mode:
+        params["search_mode"] = selected_search_mode
 
-# Pure mock mode during testing to avoid API usage.
-data = mock_articles_by_country.get(selected_country_label, mock_articles_by_country["USA"])
-
-# Backend request temporarily disabled to avoid API calls.
-# try:
-#     params = {"country": selected_country}
-#     if selected_category:
-#         params["category"] = selected_category
-#     if selected_search_mode:
-#         params["search_mode"] = selected_search_mode
-#
-#     response = requests.get(BACKEND_URL, params=params)
-#     if response.status_code == 200:
-#         data = response.json()
-#     else:
-#         data = mock_articles
-# except Exception:
-#     data = mock_articles
+    response = requests.get(BACKEND_URL, params=params)
+    if response.status_code == 200:
+        data = response.json()
+    else:
+        data = []
+except Exception:
+    data = []
 
 if search_query:
     search_lower = search_query.strip().lower()
@@ -362,8 +272,8 @@ else:
     if "llm_error" not in st.session_state:
         st.session_state.llm_error = None
 
-    def build_llm_payload(items, limit=10):
-        trimmed = items[:limit]
+    def build_llm_payload(items):
+        trimmed = items
         return {
             "articles": [
                 {
@@ -448,6 +358,9 @@ else:
                 <div class="ai-summary-label" style="color:#FF8C69;font-size:0.86rem;">Main themes</div>
                 <ul class="ai-summary-list" style="color:#F8FAFC;line-height:1.58;">{theme_items}</ul>
                 {rationale_block}
+                <div style="font-size: 0.8rem; color: #718096; margin-top: 12px; border-top: 1px solid #2D3139; padding-top: 8px; font-style: italic;">
+                    Note: To optimize performance, the AI summary is generated using the top 12 most relevant articles.
+                </div>
             </div>
             """,
             unsafe_allow_html=True
@@ -517,11 +430,10 @@ else:
                 st.subheader("Articles Over Time by Source")
                 st.line_chart(hourly_by_source, use_container_width=True)
 
-            # Cumulative counts per source to build a stacked area chart over the day.
-            cumulative_by_source = hourly_by_source.cumsum()
+            hourly_counts = hourly_by_source.sum(axis=1)
             with col4:
-                st.subheader("Cumulative Articles Over the Day")
-                st.area_chart(cumulative_by_source, use_container_width=True)
+                st.subheader("Articles Per Hour")
+                st.bar_chart(hourly_counts, use_container_width=True)
 
     df["word_count"] = df["description"].fillna("").str.split().str.len()
     df["read_time_min"] = (df["word_count"] / 200).round(2)
@@ -559,8 +471,14 @@ else:
         source = html.escape(item.get("source", "Unknown source"))
         topic = item.get("topic", "General")
         style = topic_badge_styles.get(topic, {"bg": "#ECEFF1", "fg": "#455A64"})
-        description = html.escape(item.get("description", ""))
-        url = html.escape(item.get("url", ""))
+        description_text = item.get("description") or ""
+        content_text = item.get("content") or ""
+        if content_text and description_text and content_text != description_text:
+            body_text = f"{description_text}\n\n{content_text}"
+        else:
+            body_text = content_text or description_text or "No description available."
+        body_text = html.escape(body_text)
+        url = html.escape(item.get("url", "#"))
 
         summary_style = (
             f"background: {style['bg']}; color: {style['fg']};"
@@ -579,9 +497,11 @@ else:
                 <summary style="{summary_style}">{topic} · {title}</summary>
                 <div style="{body_style}">
                     <div><strong>Source:</strong> {source}</div>
-                    <div style="margin-top: 6px;">{description}</div>
-                    <div style="margin-top: 8px;">
-                        <a href="{url}" target="_blank">Open original article</a>
+                    <div style="margin-top: 6px; color: #E2E8F0;">{body_text}</div>
+                    <div style="margin-top: 10px;">
+                        <a href="{url}" target="_blank" style="display: inline-block; background: #FF6B4A; color: #FFFFFF; padding: 6px 12px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+                            Open original article
+                        </a>
                     </div>
                 </div>
             </details>
