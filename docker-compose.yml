@@ -17,6 +17,7 @@ services:
     # Ensure logs show up in the terminal immediately
     environment:
       - PYTHONUNBUFFERED=1
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
 
 
   # --- Frontend Service (Streamlit) ---

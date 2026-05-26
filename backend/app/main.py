@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Query, HTTPException
 from typing import Optional
 from app.services.news_services import get_top_headlines
+from app.services.llm_service import generate_llm_summary
+from app.models.llm import LLMSummaryRequest, LLMSummaryResponse
 
 app = FastAPI()
 
@@ -23,3 +25,16 @@ def read_root(
         )
 
     return data
+
+
+@app.post("/llm/summary", response_model=LLMSummaryResponse)
+def llm_summary(payload: LLMSummaryRequest):
+    result, error_message, error_status = generate_llm_summary(payload.articles)
+
+    if error_message:
+        raise HTTPException(
+            status_code=error_status or 502,
+            detail=error_message
+        )
+
+    return result

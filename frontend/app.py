@@ -245,6 +245,66 @@ else:
     st.success(f"Found: {len(data)} articles")
     st.write("")
 
+    if "llm_result" not in st.session_state:
+        st.session_state.llm_result = None
+    if "llm_error" not in st.session_state:
+        st.session_state.llm_error = None
+
+    def build_llm_payload(items, limit=10):
+        trimmed = items[:limit]
+        return {
+            "articles": [
+                {
+                    "title": item.get("title", ""),
+                    "description": item.get("description", ""),
+                    "source": item.get("source", ""),
+                    "topic": item.get("topic", "")
+                }
+                for item in trimmed
+            ]
+        }
+
+    col_ai, _ = st.columns([1, 2])
+    with col_ai:
+        if st.button("Generate AI Summary"):
+            st.session_state.llm_result = None
+            st.session_state.llm_error = None
+            payload = build_llm_payload(data)
+            with st.spinner("Generating summary..."):
+                try:
+                    response = requests.post(
+                        f"{BACKEND_URL}/llm/summary",
+                        json=payload,
+                        timeout=45
+                    )
+                    if response.status_code == 200:
+                        st.session_state.llm_result = response.json()
+                    else:
+                        detail = response.json().get("detail", "LLM request failed")
+                        st.session_state.llm_error = detail
+                except requests.RequestException:
+                    st.session_state.llm_error = "Could not reach LLM service."
+
+    if st.session_state.llm_error:
+        st.error(st.session_state.llm_error)
+    elif st.session_state.llm_result:
+        result = st.session_state.llm_result
+        st.subheader("AI Summary")
+        st.write(result.get("summary", ""))
+
+        sentiment = result.get("sentiment", "Unknown")
+        st.write(f"Overall sentiment: {sentiment}")
+
+        themes = result.get("themes", [])
+        if themes:
+            st.write("Main themes:")
+            st.write(", ".join(themes))
+
+        rationale = result.get("rationale", "")
+        if rationale:
+            st.write("Why this sentiment:")
+            st.write(rationale)
+
     df = pd.DataFrame(data)
     source_counts = df["source"].value_counts()
 
