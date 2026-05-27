@@ -91,10 +91,17 @@ POSITIVE_KEYWORDS = {"rally", "growth", "record", "gain"}
 NEGATIVE_KEYWORDS = {"drop", "tighten", "flu", "risk", "loss"}
 
 TOPIC_KEYWORDS = {
-    "Sports": {"game", "nba", "spurs", "sports", "athletic", "court"},
-    "Technology": {"cybersecurity", "ai", "tech", "software", "vulnerability", "online", "data"},
-    "Business": {"market", "business", "ipo", "finance", "investment", "dollar"},
-    "Health": {"health", "flu", "medical", "vaccine", "virus"}
+
+    "Investments": {"stock", "fund", "equity", "dividend", "crypto", "bitcoin", "portfolio", "yield", "bonds", "shares", "nasdaq", "dow", "investor", "interest rate", "inflation"},
+    "Business": {"market", "business", "ipo", "finance", "dollar", "economy", "bank", "corporate", "merger", "ceo", "revenue", "startup"},
+    "Conflict & Crime": {"war", "crime", "police", "military", "attack", "conflict", "murder", "arrest", "court", "fraud", "scam", "missile", "troops"},
+    "Fashion": {"fashion", "style", "trend", "designer", "runway", "apparel", "vogue", "brand", "luxury", "clothing", "wear", "outfit"},
+    "Travel": {"travel", "flight", "tourism", "airline", "hotel", "vacation", "tourist", "destination", "border", "passenger"},
+    "Sports": {"game", "nba", "spurs", "sports", "athletic", "court", "match", "team", "player", "olympics", "championship", "tournament", "football", "soccer", "tennis"},
+    "Technology": {"cybersecurity", "ai", "tech", "software", "vulnerability", "online", "data", "apple", "google", "microsoft", "chip", "semiconductor", "app"},
+    "Health": {"health", "flu", "medical", "vaccine", "virus", "hospital", "disease", "treatment", "cancer", "doctor", "patient", "clinic"},
+    "Politics": {"election", "vote", "president", "government", "parliament", "law", "minister", "senate", "policy", "democrat", "republican", "campaign"},
+    "Entertainment": {"movie", "music", "actor", "celebrity", "hollywood", "film", "concert", "award", "star", "netflix", "show", "album"}
 }
 
 DK_QUERY_TERMS = [
@@ -142,43 +149,23 @@ def _build_dk_query(category):
     return base
 
 def _get_mock_articles():
+    # Simulerer en lang artikel på omkring 4000 ord
+    long_body_sim = (
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 300 + 
+        " Analysis shows extensive long-form coverage of this breaking event. " * 100
+    )
+
     mock_items = [
-        {
-            "title": "Global markets steady after mixed earnings",
-            "url": "https://example.com/markets-steady",
-            "source": "Reuters",
-            "description": "Investors weigh tech gains against softer retail data."
-        },
-        {
-            "title": "Elections update: key races tighten in final week",
-            "url": "https://example.com/elections-update",
-            "source": "BBC News",
-            "description": "Polls show a narrower margin across several districts."
-        },
-        {
-            "title": "New AI tools reshape newsroom workflows",
-            "url": "https://example.com/ai-newsrooms",
-            "source": "CNN",
-            "description": "Editors adopt automation for faster breaking news."
-        },
-        {
-            "title": "Copenhagen hosts sustainability summit",
-            "url": "https://example.com/copenhagen-summit",
-            "source": "DR Nyheder",
-            "description": "Leaders discuss climate targets and green transport."
-        },
-        {
-            "title": "Tech shares rally as chip demand rises",
-            "url": "https://example.com/chips-rally",
-            "source": "Bloomberg",
-            "description": "Semiconductor firms report strong quarterly outlooks."
-        },
-        {
-            "title": "Health officials monitor seasonal flu trends",
-            "url": "https://example.com/flu-trends",
-            "source": "AP News",
-            "description": "Hospitals prepare for a potential winter surge."
-        }
+        {"title": "Global markets steady after mixed earnings", "description": "Stocks remained unchanged as tech rally offsets health sector declines.", "source": "Reuters", "topic": "Business", "published_hour": 11, "url": "https://reuters.com", "content": long_body_sim},
+        {"title": "Elections update: key races tighten in final week", "description": "New polling data suggests tight margins in key swing areas.", "source": "AP News", "topic": "Politics", "published_hour": 11, "url": "https://apnews.com", "content": long_body_sim},
+        {"title": "New AI tools reshape newsroom workflows", "description": "Automated editors and summarizers gain widespread adoption.", "source": "BBC News", "topic": "Technology", "published_hour": 11, "url": "https://bbc.com", "content": long_body_sim},
+        {"title": "Copenhagen hosts sustainability summit", "description": "Leaders discuss climate metrics and new green infrastructure bonds.", "source": "CNN", "topic": "Health", "published_hour": 12, "url": "https://cnn.com", "content": long_body_sim},
+        {"title": "Tech shares rally as chip demand rises", "description": "Semiconductor manufacturing reaches new historical highs this quarter.", "source": "Bloomberg", "topic": "Technology", "published_hour": 12, "url": "https://bloomberg.com", "content": long_body_sim},
+        {"title": "Health officials monitor seasonal flu trends", "description": "Early indicators show moderate levels with updated treatments available.", "source": "DR Nyheder", "topic": "Health", "published_hour": 11, "url": "https://dr.dk", "content": long_body_sim},
+        {"title": "Breakthrough in quantum computing efficiency", "description": "Scientists stabilize qubits at slightly higher temperatures.", "source": "TechRadar", "topic": "Science", "published_hour": 12, "url": "https://techradar.com", "content": long_body_sim},
+        {"title": "Football championship group stages conclude", "description": "Underdog team advances after a dramatic final match penalty.", "source": "ESPN", "topic": "Sports", "published_hour": 12, "url": "https://espn.com", "content": long_body_sim},
+        {"title": "Central bank signals potential rate cut", "description": "Inflation targets flattening faster than initially projected.", "source": "Financial Times", "topic": "Business", "published_hour": 11, "url": "https://ft.com", "content": long_body_sim},
+        {"title": "Mars rover discovers ancient water paths", "description": "Sedimentary rock patterns confirm historical stream flows on surface.", "source": "NASA", "topic": "Science", "published_hour": 12, "url": "https://nasa.gov", "content": long_body_sim}
     ]
 
     return [
@@ -186,7 +173,22 @@ def _get_mock_articles():
             title=item["title"],
             url=item["url"],
             source=item["source"],
-            description=item["description"]
+            description=item["description"],
+            topic=item["topic"],
+            published_hour=item["published_hour"],
+            content=item["content"]  # <-- Tilføj denne linje
+        )
+        for item in mock_items
+    ]
+
+    return [
+        NewsItem(
+            title=item["title"],
+            url=item["url"],
+            source=item["source"],
+            description=item["description"],
+            topic=item["topic"],
+            published_hour=item["published_hour"]
         )
         for item in mock_items
     ]
