@@ -1,9 +1,17 @@
 import streamlit as st
 import requests
 import html
+import json
+import re
+from io import BytesIO
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
+
+CHART_FIGSIZE = (6, 4)
+CHART_DPI = 100
+
+
 
 # Set what is seen in the browser window tab and the main title on the page
 st.set_page_config(
@@ -37,6 +45,13 @@ st.markdown(
         line-height: 1.2;
         margin-bottom: 0.4rem;
     }
+    .chart-title {
+        font-size: 1.75rem !important;
+        font-weight: 800 !important;
+        line-height: 1.2 !important;
+        min-height: 2.1rem;
+        margin: 0 0 0.75rem 0;
+    }
     div[data-testid="stImage"] {
         background: #FFFFFF;
         border: 1px solid #E6E6E6;
@@ -47,6 +62,7 @@ st.markdown(
     div[data-testid="stImage"] img {
         width: 100%;
         height: auto;
+        object-fit: contain;
     }
     .stSidebar div[data-testid="stSelectbox"] > div {
         border: 1px solid #E6E6E6;
@@ -134,116 +150,97 @@ st.markdown(
 st.html(
     """
     <style>
-    /* Tving standard Streamlit-knapper (Generate & Reset) til at være orange */
-    div[data-testid="stButton"] button {
+    /* 1. Generate AI Button (Din lækre orange farve) */
+    .st-key-btn_generate button {
         background-color: #FF6B4A !important;
         color: white !important;
         border: none !important;
-        padding: 0.55rem 1.8rem !important;
-        font-size: 1.15rem !important;
-        font-weight: 700 !important;
-        border-radius: 8px !important;
-        width: auto !important;
-        transition: transform 0.1s ease, background-color 0.2s ease !important;
+        padding: 0.55rem 1.8rem !important; font-size: 1.15rem !important; font-weight: 700 !important;
+        border-radius: 8px !important; transition: transform 0.1s ease, background-color 0.2s ease !important;
         text-shadow: 0 1px 3px rgba(0, 0, 0, 0.38) !important;
     }
+    .st-key-btn_generate button:hover { background-color: #E05333 !important; transform: scale(1.02); }
     
-    /* Garanteret stålblå farve til Translate-knappen via vores egen klasse */
-    .steel-blue-btn div[data-testid="stButton"] button {
-        background-color: #4A90E2 !important;
+    /* 2. Translate Button (En stærk, tillidsvækkende UX-blå) */
+    .st-key-btn_translate button {
+        background-color: #3B82F6 !important; 
         color: white !important;
-        font-weight: 700 !important;
+        border: none !important;
+        padding: 0.55rem 1.8rem !important; font-size: 1.15rem !important; font-weight: 700 !important;
+        border-radius: 8px !important; transition: transform 0.1s ease, background-color 0.2s ease !important;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.38) !important;
     }
-    
-    /* Hover-effekter */
-    div[data-testid="stButton"] button:hover {
-        background-color: #E05333 !important;
-        transform: scale(1.02);
+    .st-key-btn_translate button:hover { background-color: #2563EB !important; transform: scale(1.02); }
+
+    /* 3. Reset Button */
+    .st-key-btn_reset button {
+        background-color: #374151 !important;
+        color: #D1D5DB !important;
+        border: none !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        transition: background-color 0.2s ease !important;
     }
-    .steel-blue-btn div[data-testid="stButton"] button:hover {
-        background-color: #3B7BC1 !important;
-    }
+    .st-key-btn_reset button:hover { background-color: #4B5563 !important; color: white !important; }
     </style>
     """
 )
 
 
+
+
 def clear_search_callback():
     st.session_state.search_query = ""
 
-search_col, reset_col = st.columns([5, 1], vertical_alignment="center")
-with search_col:
-    st.text_input(
-        "Search for a topic:",
-        key="search_query",
-        placeholder="Search for a topic...",
-        label_visibility="collapsed"
-    )
-with reset_col:
-    # Vi kobler callback-funktionen direkte til knappen via on_click
-    st.button("Reset", use_container_width=True, on_click=clear_search_callback)
 
-search_query = st.session_state.get("search_query", "")
+def render_chart_title(title):
+    st.markdown(f'<div class="chart-title">{html.escape(title)}</div>', unsafe_allow_html=True)
+
+
+def render_chart(figure):
+    figure.set_size_inches(*CHART_FIGSIZE, forward=True)
+    figure.set_dpi(CHART_DPI)
+    figure.tight_layout(pad=1.0)
+    image_buffer = BytesIO()
+    figure.savefig(
+        image_buffer,
+        format="png",
+        dpi=CHART_DPI,
+        bbox_inches=None,
+        facecolor=figure.get_facecolor()
+    )
+    image_buffer.seek(0)
+    st.image(image_buffer, use_container_width=True)
 
 # URL where the backend container lives inside the Docker network
 BACKEND_URL = "http://backend:8000"
-
-st.sidebar.header("Filters")
+DIV_TAG_PATTERN = r"</?div\b[^>]*>"
 
 country_options = {
-    "USA": "us",
-    "Denmark": "dk",
-    "Norway": "no",
-    "Sweden": "se",
-    "United Kingdom": "gb",
-    "Ireland": "ie",
-    "Netherlands": "nl",
-    "Belgium": "be",
-    "Germany": "de",
-    "France": "fr",
-    "Switzerland": "ch",
-    "Austria": "at",
-    "Italy": "it",
-    "Portugal": "pt",
-    "Poland": "pl",
-    "Czech Republic": "cz",
-    "Slovakia": "sk",
-    "Slovenia": "si",
-    "Hungary": "hu",
-    "Romania": "ro",
-    "Bulgaria": "bg",
-    "Greece": "gr",
-    "Latvia": "lv",
-    "Lithuania": "lt",
-    "Serbia": "rs",
-    "Russia": "ru",
-    "Ukraine": "ua",
-    "Israel": "il",
-    "UAE (Dubai)": "ae",
-    "Turkey": "tr",
-    "Thailand": "th",
-    "Indonesia (Bali)": "id"
+    "USA": "us", "Denmark": "dk", "Norway": "no", "Sweden": "se",
+    "United Kingdom": "gb", "Ireland": "ie", "Netherlands": "nl",
+    "Belgium": "be", "Germany": "de", "France": "fr", "Switzerland": "ch",
+    "Austria": "at", "Italy": "it", "Portugal": "pt", "Poland": "pl",
+    "Czech Republic": "cz", "Slovakia": "sk", "Slovenia": "si",
+    "Hungary": "hu", "Romania": "ro", "Bulgaria": "bg", "Greece": "gr",
+    "Latvia": "lv", "Lithuania": "lt", "Serbia": "rs", "Russia": "ru",
+    "Ukraine": "ua", "Israel": "il", "UAE (Dubai)": "ae", "Turkey": "tr",
+    "Thailand": "th", "Indonesia (Bali)": "id"
 }
 
 category_options = {
-    "All categories": None,
-    "Business": "business",
-    "Investments": "investments",
-    "Technology": "technology",
-    "Science": "science",
-    "Health": "health",
-    "Sports": "sports",
-    "Entertainment": "entertainment",
-    "Politics": "politics",
-    "Conflict & Crime": "crime",
-    "Fashion": "fashion",
-    "Travel": "travel"
+    "All categories": None, "Business": "business", "Investments": "investments",
+    "Technology": "technology", "Science": "science", "Health": "health",
+    "Sports": "sports", "Entertainment": "entertainment", "Politics": "politics",
+    "Conflict & Crime": "crime", "Fashion": "fashion", "Travel": "travel"
 }
 
 search_mode_options = {
     "Strict Danish Sources": "strict",
     "Broad Search": "broad"
 }
+
+st.sidebar.header("Filters")
 
 selected_country_label = st.sidebar.selectbox(
     "Select country",
@@ -268,6 +265,7 @@ if (
 
 st.session_state.prev_country_label = selected_country_label
 st.session_state.prev_category_label = selected_category_label
+
 
 
 selected_country = country_options[selected_country_label]
@@ -344,6 +342,20 @@ except Exception:
     else:
         data = []
 
+st.markdown('<div style="max-width: 900px; margin: auto;">', unsafe_allow_html=True)
+search_col, reset_col = st.columns([6, 1])
+
+with search_col:
+    st.text_input("Search:", key="search_query", placeholder="Search for a topic...", label_visibility="collapsed")
+
+if st.session_state.get("search_query"):
+    with reset_col:
+        st.button("Reset", key="btn_reset", use_container_width=True, on_click=clear_search_callback)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+search_query = st.session_state.get("search_query", "")
+
 if search_query:
     search_lower = search_query.strip().lower()
     data = [
@@ -384,11 +396,13 @@ else:
         }
 
     # Tæt og symmetrisk layout for knapperne
-    col_gen, col_trans = st.columns([1, 1])
+    english_speaking_countries = ["USA", "United Kingdom", "Ireland"]
+
+    col_gen, col_trans = st.columns(2)
     
     with col_gen:
-        # Generate knappen (bruger standard Streamlit farve)
-        if st.button("Generate AI Summary", use_container_width=True, type="primary"):
+        # VIGTIGT: key="btn_generate" triggerer CSS'en
+        if st.button("Generate AI Summary", key="btn_generate", use_container_width=True):
             st.session_state.llm_result = None
             st.session_state.llm_error = None
             st.session_state.llm_translation = None
@@ -401,41 +415,35 @@ else:
                 except requests.RequestException:
                     st.session_state.llm_error = "Could not reach LLM service."
 
-    with col_trans:
-        if st.session_state.get("llm_result"):
-            # Translate knappen (bruger sekundær Streamlit farve for at skille sig ud, uden hacky CSS)
-            if st.button("Translate to Local Language", key="translate_summary", use_container_width=True, type="secondary"):
-                st.session_state.llm_translation = None
-                st.session_state.llm_translation_error = None
-                
-                # Saml HELE resuméet for at sikre, at intet klippes væk
-                res = st.session_state.llm_result
-                full_text_to_translate = (
-                    f"SUMMARY: {res.get('summary', '')}\n\n"
-                    f"THEMES: {', '.join([str(t) for t in res.get('themes', [])])}\n\n"
-                    f"RATIONALE: {res.get('rationale', '')}"
-                )
-                
-                # Hvis landet ikke findes i mappet, fallback til engelsk
-                target_lang = {
-                    "Denmark": "Danish", "Norway": "Norwegian", "Sweden": "Swedish",
-                    "Germany": "German", "France": "French", "Russia": "Russian",
-                    "Italy": "Italian", "Spain": "Spanish"
-                }.get(selected_country_label, "English")
+    # Vis kun oversættelsesknappen for ikke-engelske lande
+    if selected_country_label not in english_speaking_countries:
+        with col_trans:
+            if st.session_state.get("llm_result"):
+                # VIGTIGT: key="btn_translate" triggerer CSS'en
+                if st.button("Translate to Local Language", key="btn_translate", use_container_width=True):
+                    st.session_state.llm_translation = None
+                    st.session_state.llm_translation_error = None
+                    
+                    res = st.session_state.llm_result
+                    full_text_to_translate = json.dumps({
+                        "summary": res.get("summary", ""),
+                        "themes": res.get("themes", []),
+                        "rationale": res.get("rationale", "")
+                    }, ensure_ascii=False)
+                    
+                    target_lang = {
+                        "Denmark": "Danish", "Norway": "Norwegian", "Sweden": "Swedish",
+                        "Germany": "German", "France": "French", "Russia": "Russian",
+                        "Italy": "Italian", "Spain": "Spanish", "Netherlands": "Dutch"
+                    }.get(selected_country_label, "English")
 
-                with st.spinner(f"Translating to {target_lang}..."):
-                    try:
-                        t_res = requests.post(
-                            f"{BACKEND_URL}/llm/translate", 
-                            json={"text": full_text_to_translate, "target_language": target_lang}, 
-                            timeout=60 # Øget timeout, da den nu skal oversætte mere tekst
-                        )
-                        if t_res.status_code == 200: 
-                            st.session_state.llm_translation = t_res.json().get("translated_text")
-                        else: 
-                            st.session_state.llm_translation_error = "Translation failed"
-                    except requests.RequestException:
-                        st.session_state.llm_translation_error = "Could not reach translation service."
+                    with st.spinner(f"Translating to {target_lang}..."):
+                        try:
+                            t_res = requests.post(f"{BACKEND_URL}/llm/translate", json={"text": full_text_to_translate, "target_language": target_lang}, timeout=60)
+                            if t_res.status_code == 200: st.session_state.llm_translation = t_res.json().get("translated_text")
+                            else: st.session_state.llm_translation_error = "Translation failed"
+                        except requests.RequestException:
+                            st.session_state.llm_translation_error = "Could not reach translation service."
 
     if st.session_state.llm_error:
         st.error(st.session_state.llm_error)
@@ -446,7 +454,13 @@ else:
         themes = result.get("themes", [])
         rationale = result.get("rationale", "") # Tilføjet rationale
         
-        safe_themes = [html.escape(t) for t in themes if str(t).strip()] or ["General"]
+        def clean_theme(theme):
+            theme_text = re.sub(DIV_TAG_PATTERN, "", str(theme), flags=re.IGNORECASE)
+            theme_text = theme_text.strip(" -*•")
+            theme_text = theme_text.replace("**", "").replace("__", "")
+            return html.escape(theme_text)
+
+        safe_themes = [clean_theme(theme) for theme in themes if str(theme).strip()] or ["General"]
         sentiment_val = sentiment.strip().lower()
         
         if "positive" in sentiment_val: sentiment_color = "#7CFF90"
@@ -455,16 +469,32 @@ else:
         else: sentiment_color = "#E2E8F0"
 
         if st.session_state.llm_translation:
-            display_summary = st.session_state.llm_translation
-            # Viser nu den fulde oversættelse i én blok for at undgå klipning
+            raw = st.session_state.llm_translation
+            try:
+                translated = json.loads(raw)
+                t_summary = str(translated.get("summary", "")).strip() or summary
+                t_themes = translated.get("themes") or themes
+                t_rationale = str(translated.get("rationale", "")).strip() or rationale
+            except (json.JSONDecodeError, AttributeError, TypeError):
+                t_summary = raw
+                t_themes = themes
+                t_rationale = rationale
+
+            t_summary = re.sub(DIV_TAG_PATTERN, "", t_summary, flags=re.IGNORECASE).strip()
+            t_rationale = re.sub(DIV_TAG_PATTERN, "", t_rationale, flags=re.IGNORECASE).strip()
+            t_theme_items = "".join([f"<li>{clean_theme(theme)}</li>" for theme in t_themes]) if t_themes else ""
+            t_themes_block = f'<div class="ai-summary-label">Main themes</div><ul class="ai-summary-list">{t_theme_items}</ul>' if t_theme_items else ""
+            t_rationale_block = f'<div class="ai-summary-label">Why this sentiment</div><div class="ai-summary-text">{html.escape(t_rationale)}</div>' if t_rationale else ""
             card_content = f"""
-            <div class="ai-summary-label">AI Translated Result</div>
-            <div class="ai-summary-text" style="white-space: pre-wrap;">{html.escape(display_summary)}</div>
-            <div class="ai-summary-label" style="margin-top: 15px;">Sentiment</div>
+            <div class="ai-summary-label">AI Summary · Translated</div>
+            <div class="ai-summary-text"><strong>{html.escape(t_summary)}</strong></div>
+            <div class="ai-summary-label">Sentiment</div>
             <div class="ai-summary-text"><span class="ai-sentiment-pill" style="background:{sentiment_color};color:#0B0B0B;">{html.escape(sentiment)}</span></div>
+            {t_themes_block}
+            {t_rationale_block}
             """
         else:
-            theme_items = "".join([f"<li>{t}</li>" for t in safe_themes])
+            theme_items = "".join([f"<li>{theme}</li>" for theme in safe_themes])
             rationale_block = f'<div class="ai-summary-label">Why this sentiment</div><div class="ai-summary-text">{html.escape(rationale)}</div>' if rationale else ""
             card_content = f"""
             <div class="ai-summary-label">AI Summary</div>
@@ -489,16 +519,18 @@ else:
 
     tab1, tab2, tab3 = st.tabs(["Market Distribution", "Timeline Trends", "Efficiency Metrics"])
 
+
+
     with tab1:
         st.write("")
         col1, col2 = st.columns(2)
 
         with col1:
-            st.subheader("Articles by Source")
+            render_chart_title("Articles by Source")
             # Dine originale bløde farver
             pastel_colors = ["#9575CD", "#4FC3F7", "#4DB6AC", "#FFF176", "#FF8A65", "#BA68C8"]
             
-            fig, ax = plt.subplots(figsize=(6, 4.2), facecolor="none")
+            fig, ax = plt.subplots(figsize=CHART_FIGSIZE, facecolor="none")
             ax.set_facecolor("none")
             
             # Labels (udgivere) og autotexts (%) får nu nøjagtig samme tone og tykkelse
@@ -520,16 +552,15 @@ else:
             centre_circle = plt.Circle((0, 0), 0.55, fc="none", ec="none")
             fig.gca().add_artist(centre_circle)
             ax.axis("equal")
-            plt.tight_layout()
-            st.pyplot(fig, use_container_width=True)
+            render_chart(fig)
 
     topics_series = df["topic"].value_counts().sort_values(ascending=True)
 
     if not topics_series.empty:
         with tab1:
             with col2:
-                st.subheader("Topics Covered Most")
-                fig_topic, ax_topic = plt.subplots(figsize=(6, 4.4), facecolor="none")
+                render_chart_title("Topics Covered Most")
+                fig_topic, ax_topic = plt.subplots(figsize=CHART_FIGSIZE, facecolor="none")
                 ax_topic.set_facecolor("none")
                 
                 # FIX: Ændret til en lidt mørkere, elegant stål-blå nuance
@@ -544,8 +575,7 @@ else:
                 for spine in ['left', 'bottom']:
                     ax_topic.spines[spine].set_color("#000000")
                     
-                plt.tight_layout()
-                st.pyplot(fig_topic, use_container_width=True)
+                render_chart(fig_topic)
 
     time_series = df.dropna(subset=["published_hour"]).copy()
     if not time_series.empty:
@@ -564,8 +594,8 @@ else:
             col3, col4 = st.columns(2)
 
             with col3:
-                st.subheader("Articles Over Time by Source")
-                fig_line, ax_line = plt.subplots(figsize=(6, 4.4), facecolor="none")
+                render_chart_title("Articles Over Time by Source")
+                fig_line, ax_line = plt.subplots(figsize=CHART_FIGSIZE, facecolor="none")
                 ax_line.set_facecolor("none")
                 
                 # Uden orange toner: Kører nu i blå, grøn, lilla, pink, cyan og gul
@@ -594,12 +624,11 @@ else:
                 for spine in ['left', 'bottom']:
                     ax_line.spines[spine].set_color("#000000")
                     
-                plt.tight_layout()
-                st.pyplot(fig_line, use_container_width=True)
+                render_chart(fig_line)
 
             with col4:
-                st.subheader("Articles Per Hour")
-                fig_hour, ax_hour = plt.subplots(figsize=(6, 4.4), facecolor="none")
+                render_chart_title("Articles Per Hour")
+                fig_hour, ax_hour = plt.subplots(figsize=CHART_FIGSIZE, facecolor="none")
                 ax_hour.set_facecolor("none")
                 
                 # FIX: Farven er nu ændret til en dyb, elegant blodrød (#991B1B)
@@ -616,14 +645,13 @@ else:
                     ax_hour.spines[spine].set_color("#000000")
                     
                 plt.xticks(rotation=0) 
-                plt.tight_layout()
-                st.pyplot(fig_hour, use_container_width=True)
+                render_chart(fig_hour)
 
-    # Gå tilbage til den rene multiplikator på beskrivelsen for flotte, dybe minuttal
+    # Beregn læsetid baseret på vores multiplikator
     df["word_count"] = df["description"].fillna("").str.split().str.len() * 150
     df["read_time_min"] = (df["word_count"] / 200).round(2)
-
-    df["read_time_min"] = (df["word_count"] / 200).round(2)
+    
+    # Klargør data til tab3
     read_time_by_source = (
         df.groupby("source")["read_time_min"].mean().round(2)
     ).sort_values(ascending=False)
@@ -632,8 +660,8 @@ else:
         st.write("")
         _, col_center, _ = st.columns([1, 2, 1])
         with col_center:
-            st.subheader("Estimated Reading Time per Source (min)")
-            fig_read, ax_read = plt.subplots(figsize=(6, 4.4), facecolor="none")
+            render_chart_title("Estimated Reading Time per Source (min)")
+            fig_read, ax_read = plt.subplots(figsize=CHART_FIGSIZE, facecolor="none")
             ax_read.set_facecolor("none")
             
             ax_read.bar(read_time_by_source.index, read_time_by_source.values, color="#7E57C2", width=0.55)
@@ -648,17 +676,20 @@ else:
                 ax_read.spines[spine].set_color("#000000")
                 
             plt.xticks(rotation=45, ha="right", color="#000000")
-            plt.tight_layout()
-            st.pyplot(fig_read, use_container_width=True)
+            render_chart(fig_read)
 
     topic_badge_styles = {
-        "Business": {"bg": "#E8F5E9", "fg": "#2E7D32"},
+        "Business": {"bg": "#E8F5E9", "fg": "#2E7D32"}, 
         "Technology": {"bg": "#E3F2FD", "fg": "#1565C0"},
-        "Politics": {"bg": "#FFEBEE", "fg": "#C62828"},
+        "Politics": {"bg": "#FFEBEE", "fg": "#C62828"}, 
         "Health": {"bg": "#F3E5F5", "fg": "#6A1B9A"},
-        "Energy": {"bg": "#FFF8E1", "fg": "#8D6E63"},
-        "Culture": {"bg": "#F1F8E9", "fg": "#2E7D32"},
-        "Sports": {"bg": "#E1F5FE", "fg": "#0277BD"}
+        "Sports": {"bg": "#E1F5FE", "fg": "#0277BD"},
+        "Entertainment": {"bg": "#FFF3E0", "fg": "#E65100"},
+        
+        "Investments": {"bg": "#E8EAF6", "fg": "#283593"},       
+        "Conflict & Crime": {"bg": "#FCE4EC", "fg": "#880E4F"}, 
+        "Fashion": {"bg": "#F3E5F5", "fg": "#C2185B"},           
+        "Travel": {"bg": "#E0F2F1", "fg": "#00695C"}             
     }
 
     def render_article_expander(item):

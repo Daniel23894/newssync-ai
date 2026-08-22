@@ -165,7 +165,9 @@ def translate_text(
         return None, "No text provided", 400
 
     system_prompt = (
-        "You are a precise translator. Return only the translated text."
+        "You are a precise translator. Return valid JSON only with the keys "
+        "summary, themes, and rationale. Translate the values, keep themes "
+        "as a JSON array, and do not add markdown or extra text."
     )
     user_prompt = (
         f"Translate this text into {target_language}:\n\n{text}"

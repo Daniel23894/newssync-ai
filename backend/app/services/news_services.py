@@ -3,6 +3,7 @@ import os
 import logging
 from datetime import datetime
 from app.models.news_item import NewsItem
+import random
 
 
 API_KEY = os.getenv("GNEWS_API_KEY")
@@ -91,17 +92,16 @@ POSITIVE_KEYWORDS = {"rally", "growth", "record", "gain"}
 NEGATIVE_KEYWORDS = {"drop", "tighten", "flu", "risk", "loss"}
 
 TOPIC_KEYWORDS = {
-
-    "Investments": {"stock", "fund", "equity", "dividend", "crypto", "bitcoin", "portfolio", "yield", "bonds", "shares", "nasdaq", "dow", "investor", "interest rate", "inflation"},
-    "Business": {"market", "business", "ipo", "finance", "dollar", "economy", "bank", "corporate", "merger", "ceo", "revenue", "startup"},
-    "Conflict & Crime": {"war", "crime", "police", "military", "attack", "conflict", "murder", "arrest", "court", "fraud", "scam", "missile", "troops"},
-    "Fashion": {"fashion", "style", "trend", "designer", "runway", "apparel", "vogue", "brand", "luxury", "clothing", "wear", "outfit"},
-    "Travel": {"travel", "flight", "tourism", "airline", "hotel", "vacation", "tourist", "destination", "border", "passenger"},
-    "Sports": {"game", "nba", "spurs", "sports", "athletic", "court", "match", "team", "player", "olympics", "championship", "tournament", "football", "soccer", "tennis"},
-    "Technology": {"cybersecurity", "ai", "tech", "software", "vulnerability", "online", "data", "apple", "google", "microsoft", "chip", "semiconductor", "app"},
-    "Health": {"health", "flu", "medical", "vaccine", "virus", "hospital", "disease", "treatment", "cancer", "doctor", "patient", "clinic"},
-    "Politics": {"election", "vote", "president", "government", "parliament", "law", "minister", "senate", "policy", "democrat", "republican", "campaign"},
-    "Entertainment": {"movie", "music", "actor", "celebrity", "hollywood", "film", "concert", "award", "star", "netflix", "show", "album"}
+    "Investments": {"stock", "fund", "equity", "dividend", "crypto", "bitcoin", "portfolio", "yield", "bond", "share", "nasdaq", "dow", "investor", "rate", "inflation", "aktie", "børs"},
+    "Business": {"market", "business", "ipo", "finance", "dollar", "economy", "bank", "corporate", "merger", "ceo", "revenue", "startup", "erhverv", "økonomi", "handel"},
+    "Conflict & Crime": {"war", "crime", "police", "military", "attack", "conflict", "murder", "arrest", "court", "fraud", "scam", "missile", "troop", "krig", "politi", "krim", "russ", "ukrain", "asyl", "migrat"},
+    "Fashion": {"fashion", "style", "trend", "designer", "runway", "apparel", "vogue", "brand", "luxury", "clothing", "wear", "outfit", "mode", "tøj"},
+    "Travel": {"travel", "flight", "tourism", "airline", "hotel", "vacation", "tourist", "destination", "border", "passenger", "rejse", "turist", "fly"},
+    "Sports": {"game", "nba", "spurs", "sports", "athletic", "court", "match", "team", "player", "olympic", "championship", "tournament", "football", "soccer", "tennis", "sport", "fodbold", "voetbal", "liga"},
+    "Technology": {"cybersecurity", "ai", "tech", "software", "vulnerability", "online", "data", "apple", "google", "microsoft", "chip", "semiconductor", "app", "cyber"},
+    "Health": {"health", "flu", "medical", "vaccine", "virus", "hospital", "disease", "treatment", "cancer", "doctor", "patient", "clinic", "sundhed", "sygehus"},
+    "Politics": {"election", "vote", "president", "government", "parliament", "law", "minister", "senate", "policy", "democrat", "republican", "campaign", "valg", "regering", "politi", "ambassad", "eu"},
+    "Entertainment": {"movie", "music", "actor", "celebrity", "hollywood", "film", "concert", "award", "star", "netflix", "show", "album", "kultur", "tv"}
 }
 
 DK_QUERY_TERMS = [
@@ -113,14 +113,19 @@ DK_QUERY_TERMS = [
 
 
 def _parse_published_hour(raw_date):
-    if not raw_date:
-        return None
-
+    # Hvis vi har en dato, prøv at bruge den, ellers spred dem ud over 8-20
     try:
-        dt_str = raw_date.replace("Z", "+00:00")
-        return datetime.fromisoformat(dt_str).hour
-    except ValueError:
-        return None
+        if raw_date:
+            dt_str = raw_date.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(dt_str)
+            base_h = dt.hour
+        else:
+            base_h = random.randint(8, 18)
+            
+        # Tilføj en kraftig spredning (jitter)
+        return base_h + random.uniform(0, 2) 
+    except Exception:
+        return random.randint(8, 18)
 
 
 def _score_sentiment(text):
